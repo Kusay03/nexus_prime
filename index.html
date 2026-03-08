@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Project Nexus - Live Graph</title>
+    <script type="text/javascript" src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+    <style>
+        body {
+            background-color: #0f172a;
+            /* Dark Hacker Blue */
+            color: #10b981;
+            /* Matrix Green */
+            font-family: 'Courier New', Courier, monospace;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        #mynetwork {
+            width: 90vw;
+            height: 80vh;
+            border: 2px solid #334155;
+            border-radius: 10px;
+            background-color: #020617;
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.2);
+        }
+
+        h1 {
+            margin-bottom: 5px;
+            text-shadow: 0 0 5px #10b981;
+        }
+
+        p {
+            margin-top: 0;
+            color: #94a3b8;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>[ PROJECT NEXUS ]</h1>
+    <p>Live Threat Intelligence Graph</p>
+
+    <div id="mynetwork"></div>
+
+    <script type="text/javascript">
+        // 1. Where to inject the graph
+        const container = document.getElementById('mynetwork');
+
+        // 2. Fetch the data from your FastAPI container
+        async function loadGraph() {
+            try {
+                // Hitting the API we just built!
+                const response = await fetch('http://localhost:8080/api/graph');
+                const data = await response.json();
+
+                // Extract the array from your JSON response
+                const connections = data.graph_connections || data.connections;
+
+                // 3. Prepare Nodes and Edges
+                const nodes = new vis.DataSet();
+                const edges = new vis.DataSet();
+                const addedNodes = new Set(); // To prevent duplicate nodes
+
+                connections.forEach(item => {
+                    // Add Attacker Node (Red)
+                    if (!addedNodes.has(item.attacker)) {
+                        nodes.add({ id: item.attacker, label: item.attacker, color: '#ef4444', font: { color: 'white' } });
+                        addedNodes.add(item.attacker);
+                    }
+                    // Add Target Node (Blue)
+                    if (!addedNodes.has(item.target)) {
+                        nodes.add({ id: item.target, label: item.target, color: '#3b82f6', font: { color: 'white' } });
+                        addedNodes.add(item.target);
+                    }
+                    // Add the Connection (Arrow)
+                    edges.add({
+                        from: item.attacker,
+                        to: item.target,
+                        label: item.action, // e.g., "UNAUTHORIZED_ACCESS"
+                        arrows: 'to',
+                        color: { color: '#10b981' },
+                        font: { color: '#10b981', align: 'middle' }
+                    });
+                });
+
+                // 4. Draw the Graph!
+                const graphData = { nodes: nodes, edges: edges };
+                const options = {
+                    physics: {
+                        stabilization: false,
+                        barnesHut: { springLength: 200 } // Makes the nodes bouncy
+                    }
+                };
+                new vis.Network(container, graphData, options);
+
+            } catch (error) {
+                console.error("Connection failed! Did you add CORS to FastAPI?", error);
+                document.getElementById('mynetwork').innerHTML = "<h3 style='color:red; text-align:center; padding:20px;'>Error: Cannot connect to API. Is the container running?</h3>";
+            }
+        }
+
+        // Start the process
+        loadGraph();
+    </script>
+</body>
+
+</html>
