@@ -16,7 +16,8 @@ DB_HOST = "host.containers.internal"
 DB_PORT = "5432"
 DB_NAME = "postgres"
 DB_USER = "postgres"
-DB_PASSWORD = "mysecretpassword" # Put your Postgres password here!
+# On va chercher le mot de passe caché, ou on met une erreur s'il est introuvable
+DB_PASSWORD = os.getenv("DB_PASSWORD")
 
 def get_db_connection():
     """This function opens the door to the database."""
