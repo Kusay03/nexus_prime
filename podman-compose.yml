@@ -38,8 +38,9 @@ services:
 
   api:
     build:
-      context: ./api
-      dockerfile: Containerfile
+      context: .
+      dockerfile: api/Containerfile
+      network: host
     container_name: nexus-api
     network_mode: host
     env_file: .env

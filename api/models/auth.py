@@ -18,6 +18,13 @@ class UserCreate(BaseModel):
     tenant_id: str = Field(..., min_length=1)
 
 
+class BootstrapCreate(BaseModel):
+    username: str = Field(..., min_length=3)
+    email: str = Field(..., min_length=5)
+    password: str = Field(..., min_length=8)
+    tenant_id: str = Field(..., min_length=1)
+
+
 class UserResponse(BaseModel):
     user_id: str
     username: str
@@ -33,6 +40,10 @@ class TokenResponse(BaseModel):
     expires_in: int      # seconds
     tenant_id: str
     role: str
+
+
+class BootstrapStatusResponse(BaseModel):
+    needs_bootstrap: bool
 
 
 class CurrentUser(BaseModel):

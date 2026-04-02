@@ -11,6 +11,12 @@ class Settings(BaseSettings):
     jwt_secret: str
     jwt_algorithm: str = "HS256"
     jwt_expiry_minutes: int = 60
+    allowed_origins: list[str] = ["http://localhost:5173", "http://localhost:3000"]
+    rate_limit_enabled: bool = True
+    rate_limit_api_max_requests: int = 120
+    rate_limit_api_window_seconds: int = 60
+    rate_limit_auth_max_requests: int = 5
+    rate_limit_auth_window_seconds: int = 60
 
 
 settings = Settings()

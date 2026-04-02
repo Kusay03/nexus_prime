@@ -1,0 +1,41 @@
+Total messages: 40 (Errors: 0, Warnings: 0)
+Returning 38 messages for level "info"
+
+[INFO] Download the React DevTools for a better development experience: https://react.dev/link/react-devtools @ http://localhost:5174/node_modules/.vite/deps/react-dom_client.js?v=c1120938:14337
+[TIMESTAMP] Blocking Track @ http://localhost:5174/node_modules/.vite/deps/react-dom_client.js?v=c1120938:8138
+[TIMESTAMP] Transition Track @ http://localhost:5174/node_modules/.vite/deps/react-dom_client.js?v=c1120938:8138
+[TIMESTAMP] Suspense Track @ http://localhost:5174/node_modules/.vite/deps/react-dom_client.js?v=c1120938:8138
+[TIMESTAMP] Idle Track @ http://localhost:5174/node_modules/.vite/deps/react-dom_client.js?v=c1120938:8138
+[TIMESTAMP] Render @ http://localhost:5174/node_modules/.vite/deps/react-dom_client.js?v=c1120938:2529
+[TIMESTAMP] BrowserRouter @ http://localhost:5174/node_modules/.vite/deps/react-dom_client.js?v=c1120938:2523
+[TIMESTAMP] Commit @ http://localhost:5174/node_modules/.vite/deps/react-dom_client.js?v=c1120938:8682
+[TIMESTAMP] Waiting for Paint @ http://localhost:5174/node_modules/.vite/deps/react-dom_client.js?v=c1120938:8797
+[TIMESTAMP] App @ http://localhost:5174/node_modules/.vite/deps/react-dom_client.js?v=c1120938:2468
+[TIMESTAMP] BrowserRouter @ http://localhost:5174/node_modules/.vite/deps/react-dom_client.js?v=c1120938:2468
+[TIMESTAMP] Router @ http://localhost:5174/node_modules/.vite/deps/react-dom_client.js?v=c1120938:2468
+[TIMESTAMP] Blocking Track @ http://localhost:5174/node_modules/.vite/deps/react-dom_client.js?v=c1120938:8138
+[TIMESTAMP] Transition Track @ http://localhost:5174/node_modules/.vite/deps/react-dom_client.js?v=c1120938:8138
+[TIMESTAMP] Suspense Track @ http://localhost:5174/node_modules/.vite/deps/react-dom_client.js?v=c1120938:8138
+[TIMESTAMP] Idle Track @ http://localhost:5174/node_modules/.vite/deps/react-dom_client.js?v=c1120938:8138
+[TIMESTAMP] Blocking Track @ http://localhost:5174/node_modules/.vite/deps/react-dom_client.js?v=c1120938:8138
+[TIMESTAMP] Transition Track @ http://localhost:5174/node_modules/.vite/deps/react-dom_client.js?v=c1120938:8138
+[TIMESTAMP] Suspense Track @ http://localhost:5174/node_modules/.vite/deps/react-dom_client.js?v=c1120938:8138
+[TIMESTAMP] Idle Track @ http://localhost:5174/node_modules/.vite/deps/react-dom_client.js?v=c1120938:8138
+[TIMESTAMP] Render @ http://localhost:5174/node_modules/.vite/deps/react-dom_client.js?v=c1120938:2529
+[TIMESTAMP] Throttled @ http://localhost:5174/node_modules/.vite/deps/react-dom_client.js?v=c1120938:2563
+[TIMESTAMP] Commit @ http://localhost:5174/node_modules/.vite/deps/react-dom_client.js?v=c1120938:8682
+[TIMESTAMP] Waiting for Paint @ http://localhost:5174/node_modules/.vite/deps/react-dom_client.js?v=c1120938:8797
+[TIMESTAMP] Routes @ http://localhost:5174/node_modules/.vite/deps/react-dom_client.js?v=c1120938:2468
+[TIMESTAMP] RenderedRoute @ http://localhost:5174/node_modules/.vite/deps/react-dom_client.js?v=c1120938:2468
+[TIMESTAMP] Login @ http://localhost:5174/node_modules/.vite/deps/react-dom_client.js?v=c1120938:2468
+[TIMESTAMP] Login @ http://localhost:5174/node_modules/.vite/deps/react-dom_client.js?v=c1120938:2523
+[TIMESTAMP] Login @ http://localhost:5174/node_modules/.vite/deps/react-dom_client.js?v=c1120938:2523
+[TIMESTAMP] Remaining Effects @ http://localhost:5174/node_modules/.vite/deps/react-dom_client.js?v=c1120938:8813
+[TIMESTAMP] Blocking Track @ http://localhost:5174/node_modules/.vite/deps/react-dom_client.js?v=c1120938:8138
+[TIMESTAMP] Transition Track @ http://localhost:5174/node_modules/.vite/deps/react-dom_client.js?v=c1120938:8138
+[TIMESTAMP] Suspense Track @ http://localhost:5174/node_modules/.vite/deps/react-dom_client.js?v=c1120938:8138
+[TIMESTAMP] Idle Track @ http://localhost:5174/node_modules/.vite/deps/react-dom_client.js?v=c1120938:8138
+[TIMESTAMP] Render @ http://localhost:5174/node_modules/.vite/deps/react-dom_client.js?v=c1120938:2529
+[TIMESTAMP] Commit @ http://localhost:5174/node_modules/.vite/deps/react-dom_client.js?v=c1120938:8682
+[TIMESTAMP] Waiting for Paint @ http://localhost:5174/node_modules/.vite/deps/react-dom_client.js?v=c1120938:8797
+[TIMESTAMP] Login @ http://localhost:5174/node_modules/.vite/deps/react-dom_client.js?v=c1120938:2468

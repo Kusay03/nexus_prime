@@ -10,8 +10,16 @@ from redis.asyncio import Redis
 
 from config import settings
 from db import get_session
-from middleware.tenant import get_current_user
-from models.auth import CurrentUser, Role, TokenResponse, UserCreate, UserResponse
+from middleware.tenant import get_current_user, require_roles
+from models.auth import (
+    BootstrapCreate,
+    BootstrapStatusResponse,
+    CurrentUser,
+    Role,
+    TokenResponse,
+    UserCreate,
+    UserResponse,
+)
 from redis_client import get_redis
 
 router = APIRouter()
@@ -27,6 +35,20 @@ def _hash(plain: str) -> str:
 
 def _verify(plain: str, hashed: str) -> bool:
     return pwd_context.verify(plain, hashed)
+
+
+async def _username_exists(session: AsyncSession, username: str) -> bool:
+    result = await session.run(
+        "MATCH (u:User {username: $username}) RETURN u.user_id AS id",
+        username=username,
+    )
+    return bool(await result.single())
+
+
+async def _has_any_users(session: AsyncSession) -> bool:
+    result = await session.run("MATCH (u:User) RETURN count(u) AS count")
+    record = await result.single()
+    return bool(record and record["count"] > 0)
 
 
 def _create_token(user_id: str, username: str, tenant_id: str, role: str) -> str:
@@ -53,28 +75,15 @@ def _node_to_response(u: dict) -> UserResponse:
     )
 
 
-# ── Endpoints ─────────────────────────────────────────────────────────────────
-
-@router.post("/register", response_model=UserResponse, status_code=201)
-async def register(
-    body: UserCreate,
-    session: AsyncSession = Depends(get_session),
+async def _create_user(
+    session: AsyncSession,
+    *,
+    username: str,
+    email: str,
+    password: str,
+    role: Role,
+    tenant_id: str,
 ) -> UserResponse:
-    """
-    Public registration endpoint (Phase 3 prototype).
-    In production: gate this behind an admin token for subsequent users.
-    """
-    # Reject duplicate usernames (globally unique, not just per-tenant)
-    check = await session.run(
-        "MATCH (u:User {username: $username}) RETURN u.user_id AS id",
-        username=body.username,
-    )
-    if await check.single():
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"Username '{body.username}' is already taken",
-        )
-
     user_id = str(uuid.uuid4())
     result = await session.run(
         """
@@ -91,17 +100,86 @@ async def register(
         RETURN u
         """,
         user_id=user_id,
-        username=body.username,
-        email=body.email,
-        hashed_password=_hash(body.password),
-        role=body.role.value,
-        tenant_id=body.tenant_id,
+        username=username,
+        email=email,
+        hashed_password=_hash(password),
+        role=role.value,
+        tenant_id=tenant_id,
     )
     record = await result.single()
     if not record:
         raise HTTPException(status_code=500, detail="Failed to create user")
 
     return _node_to_response(dict(record["u"]))
+
+
+# ── Endpoints ─────────────────────────────────────────────────────────────────
+
+@router.get("/bootstrap/status", response_model=BootstrapStatusResponse)
+async def bootstrap_status(
+    session: AsyncSession = Depends(get_session),
+) -> BootstrapStatusResponse:
+    return BootstrapStatusResponse(needs_bootstrap=not await _has_any_users(session))
+
+
+@router.post("/bootstrap", response_model=UserResponse, status_code=201)
+async def bootstrap(
+    body: BootstrapCreate,
+    session: AsyncSession = Depends(get_session),
+) -> UserResponse:
+    """
+    Creates the first admin account for a fresh deployment.
+    Disabled once any user exists in the system.
+    """
+    if await _has_any_users(session):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Bootstrap is no longer available. Log in as an admin to create users.",
+        )
+
+    if await _username_exists(session, body.username):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Username '{body.username}' is already taken",
+        )
+
+    return await _create_user(
+        session,
+        username=body.username,
+        email=body.email,
+        password=body.password,
+        role=Role.ADMIN,
+        tenant_id=body.tenant_id,
+    )
+
+
+@router.post("/register", response_model=UserResponse, status_code=201)
+async def register(
+    body: UserCreate,
+    current_user: CurrentUser = Depends(require_roles(Role.ADMIN)),
+    session: AsyncSession = Depends(get_session),
+) -> UserResponse:
+    """Admin-managed user creation within the current tenant."""
+    if body.tenant_id != current_user.tenant_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admins can only create users for their own tenant",
+        )
+
+    if await _username_exists(session, body.username):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Username '{body.username}' is already taken",
+        )
+
+    return await _create_user(
+        session,
+        username=body.username,
+        email=body.email,
+        password=body.password,
+        role=body.role,
+        tenant_id=body.tenant_id,
+    )
 
 
 @router.post("/token", response_model=TokenResponse)

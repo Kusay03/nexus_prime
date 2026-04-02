@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(podman --version && podman-compose --version 2>/dev/null || echo \"podman-compose not found\")",
+      "Bash(podman ps:*)",
+      "Bash(podman logs:*)",
+      "Bash(curl -s http://localhost:8000/ | python3 -m json.tool)",
+      "Bash(curl -s http://localhost:8000/ontology/entity-types \\\\\n  -H \"X-Tenant-ID: nexus-cyber\" | python3 -m json.tool)",
+      "Bash(podman restart:*)",
+      "Bash(curl -s http://localhost:8000/docs | grep -o '\"ingest[^\"]*\"' | head -5)",
+      "Bash(curl -s http://localhost:8000/openapi.json | python3 -c \"import sys,json; paths=json.load\\(sys.stdin\\)['paths']; [print\\(p\\) for p in paths]\")",
+      "Bash(podman-compose build:*)",
+      "Bash(podman-compose up:*)",
+      "Bash(sleep 4 && curl -s http://localhost:8000/openapi.json | python3 -c \"import sys,json; paths=json.load\\(sys.stdin\\)['paths']; [print\\(p\\) for p in paths]\")",
+      "Bash(curl -s \"http://localhost:8000/ingest/dlq?key=dlq:nexus-cyber:csv:20260314T001750\" | python3 -m json.tool)",
+      "Bash(curl -s -X POST http://localhost:8000/query/traverse \\\\\n  -H \"Content-Type: application/json\" \\\\\n  -H \"X-Tenant-ID: nexus-cyber\" \\\\\n  -d '{\"entity_id\": \"ce73b2a2-b179-4e45-9e53-8ae55f07c48c\", \"depth\": 2}' \\\\\n  | python3 -m json.tool)",
+      "Bash(podman stop:*)",
+      "Bash(echo \"=== REGISTER ===\"\ncurl -s -X POST http://localhost:8000/auth/register \\\\\n  -H \"Content-Type: application/json\" \\\\\n  -d '{\"username\":\"nexus_admin\",\"email\":\"admin@nexus-cyber.io\",\"password\":\"NexusPhase3\",\"role\":\"admin\",\"tenant_id\":\"nexus-cyber\"}' \\\\\n  | python3 -m json.tool)",
+      "Bash(curl -sv http://localhost:8000/auth/register \\\\\n  -H \"Content-Type: application/json\" \\\\\n  -d '{\"username\":\"nexus_admin\",\"email\":\"admin@nexus-cyber.io\",\"password\":\"NexusPhase3\",\"role\":\"admin\",\"tenant_id\":\"nexus-cyber\"}' 2>&1 | grep -E \"< HTTP|{\" | head -5)",
+      "Bash(mkdir:*)",
+      "Bash(npx tsc:*)",
+      "Bash(kill:*)",
+      "Bash(pip install:*)",
+      "Bash(curl:*)",
+      "Bash(podman port:*)",
+      "Bash(podman inspect:*)"
+    ]
+  }
+}

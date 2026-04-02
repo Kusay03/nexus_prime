@@ -1,0 +1,16 @@
+- generic [ref=e6]:
+  - generic [ref=e7]:
+    - paragraph [ref=e8]: Operational Intelligence
+    - heading "Project Nexus" [level=1] [ref=e9]
+    - paragraph [ref=e10]: Model customers, contracts, invoices, and support pressure in one shared revenue workspace.
+  - generic [ref=e11]:
+    - generic [ref=e12]:
+      - generic [ref=e13]: Username
+      - textbox "Username" [ref=e14]:
+        - /placeholder: analyst
+    - generic [ref=e15]:
+      - generic [ref=e16]: Password
+      - textbox "Password" [ref=e17]:
+        - /placeholder: password
+    - button "Log in" [ref=e18] [cursor=pointer]
+  - paragraph [ref=e19]: Need access? Ask a tenant admin to create your account.

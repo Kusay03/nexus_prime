@@ -12,8 +12,78 @@ from models.query import (
     GraphResponse,
     TraverseRequest,
 )
+from models.workspace import (
+    EntityDetailResponse,
+    RecentAction,
+    RelatedEntity,
+    SearchRequest,
+    SearchResponse,
+    SearchResult,
+)
 
 router = APIRouter()
+
+
+def _pick_label(type_name: str, values: list[dict[str, str]]) -> str:
+    preferred_keys = (
+        "Display Name",
+        "Customer Name",
+        "Invoice Number",
+        "Contract Name",
+        "Ticket ID",
+        "Owner Name",
+        "Document Title",
+        "Observation",
+        "Hypothesis",
+        "Alert Title",
+        "Recommendation",
+        "Run Label",
+        "Template Name",
+        "Name",
+        "name",
+        "Username",
+        "Hostname",
+        "IP Address",
+        "Email",
+        "Domain",
+        "CVE ID",
+    )
+    properties = {
+        value["name"]: value["val"]
+        for value in values
+        if value["name"] and value["val"] not in ("None", "")
+    }
+    for key in preferred_keys:
+        if properties.get(key):
+            return properties[key]
+    for value in properties.values():
+        try:
+            float(value)
+        except ValueError:
+            return value
+    return next(iter(properties.values()), type_name)
+
+
+def _highlight_reason(type_name: str, properties: dict[str, str]) -> str:
+    if type_name == "Customer":
+        renewal = properties.get("Renewal Window")
+        health = properties.get("Health Status", "Needs review")
+        if renewal:
+            return f"{health} • renews in {renewal}"
+        return f"Health: {health}"
+    if type_name == "Invoice":
+        status = properties.get("Payment Status", "Unknown")
+        days_late = properties.get("Days Late")
+        if days_late not in (None, ""):
+            return f"{status} • {days_late} days late"
+        return f"Payment: {status}"
+    if type_name == "SupportTicket":
+        return f"{properties.get('Severity', 'Unspecified')} severity • {properties.get('Status', 'Open')}"
+    if type_name == "Contract":
+        return f"Renewal due {properties.get('Renewal Date', properties.get('Renewal Window', 'Active'))}"
+    if type_name in {"Observation", "Hypothesis", "Alert", "Recommendation", "ModelRun", "PromptTemplate", "Document"}:
+        return properties.get("Display Name") or type_name
+    return "Operational hotspot"
 
 
 @router.post("/traverse", response_model=GraphResponse)
@@ -74,21 +144,6 @@ async def traverse(
             continue
         seen_node_ids.add(node_id)
 
-        # Prefer string attribute values for the display label (not numeric)
-        label: str = row["type_name"]
-        for v in row["values"]:
-            if v["name"] and v["val"] and v["val"] not in ("None", ""):
-                try:
-                    float(v["val"])
-                except ValueError:
-                    label = v["val"]
-                    break
-        else:
-            for v in row["values"]:
-                if v["name"] and v["val"] and v["val"] not in ("None", ""):
-                    label = v["val"]
-                    break
-
         properties = {
             v["name"]: v["val"]
             for v in row["values"]
@@ -99,7 +154,7 @@ async def traverse(
             CytoscapeNode(
                 data=CytoscapeNodeData(
                     id=node_id,
-                    label=label,
+                    label=_pick_label(row["type_name"], row["values"]),
                     type=row["type_name"],
                     tenant_id=row["tenant_id"],
                     properties=properties,
@@ -137,3 +192,217 @@ async def traverse(
     ]
 
     return GraphResponse(nodes=cyto_nodes, edges=cyto_edges)
+
+
+@router.post("/search", response_model=SearchResponse)
+async def search_entities(
+    body: SearchRequest,
+    current_user: CurrentUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> SearchResponse:
+    search_term = body.query.strip().lower()
+    result = await session.run(
+        """
+        MATCH (e:Entity {tenant_id: $tenant_id})
+        OPTIONAL MATCH (e)-[hv:HAS_VALUE]->(a:Attribute)
+        OPTIONAL MATCH (e)-[rel:CONNECTED_TO]-(:Entity {tenant_id: $tenant_id})
+        WITH
+            e,
+            count(DISTINCT rel) AS relationship_count,
+            collect(
+                CASE
+                    WHEN a IS NULL THEN NULL
+                    ELSE {
+                        name: a.name,
+                        val: coalesce(hv.value_string, toString(hv.value_numeric), hv.value_date, '')
+                    }
+                END
+            ) AS raw_values
+        WITH
+            e,
+            relationship_count,
+            [value IN raw_values WHERE value IS NOT NULL AND value.val <> ''] AS values
+        WITH
+            e,
+            relationship_count,
+            values,
+            [value IN values | toLower(value.val)] AS searchable_values
+        WHERE
+            toLower(e.id) CONTAINS $search_term
+            OR toLower(e.type_name) CONTAINS $search_term
+            OR any(value IN searchable_values WHERE value CONTAINS $search_term)
+        RETURN
+            e.id AS entity_id,
+            e.type_name AS type_name,
+            relationship_count,
+            values
+        ORDER BY relationship_count DESC, e.created_at DESC
+        LIMIT $limit
+        """,
+        tenant_id=current_user.tenant_id,
+        search_term=search_term,
+        limit=body.limit,
+    )
+    rows = await result.data()
+    results = []
+    for row in rows:
+        properties = {
+            value["name"]: value["val"]
+            for value in row["values"]
+            if value["name"] and value["val"] not in ("None", "")
+        }
+        results.append(
+            SearchResult(
+                entity_id=row["entity_id"],
+                label=_pick_label(row["type_name"], row["values"]),
+                type_name=row["type_name"],
+                match_reason=_highlight_reason(row["type_name"], properties),
+                properties=properties,
+                relationship_count=row["relationship_count"],
+            )
+        )
+    return SearchResponse(results=results)
+
+
+@router.get("/entity/{entity_id}", response_model=EntityDetailResponse)
+async def entity_detail(
+    entity_id: str,
+    current_user: CurrentUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> EntityDetailResponse:
+    tenant_id = current_user.tenant_id
+
+    result = await session.run(
+        """
+        MATCH (e:Entity {id: $entity_id, tenant_id: $tenant_id})
+        OPTIONAL MATCH (e)-[hv:HAS_VALUE]->(a:Attribute)
+        OPTIONAL MATCH (e)-[rel:CONNECTED_TO]-(:Entity {tenant_id: $tenant_id})
+        WITH
+            e,
+            count(DISTINCT rel) AS relationship_count,
+            collect(
+                CASE
+                    WHEN a IS NULL THEN NULL
+                    ELSE {
+                        name: a.name,
+                        val: coalesce(hv.value_string, toString(hv.value_numeric), hv.value_date, '')
+                    }
+                END
+            ) AS raw_values
+        RETURN
+            e.id AS entity_id,
+            e.type_name AS type_name,
+            e.tenant_id AS tenant_id,
+            relationship_count,
+            [value IN raw_values WHERE value IS NOT NULL AND value.val <> ''] AS values
+        """,
+        entity_id=entity_id,
+        tenant_id=tenant_id,
+    )
+    row = await result.single()
+    if not row:
+        raise HTTPException(status_code=404, detail=f"Entity '{entity_id}' not found")
+
+    related_result = await session.run(
+        """
+        MATCH (src:Entity {id: $entity_id, tenant_id: $tenant_id})-[r:CONNECTED_TO]->(tgt:Entity {tenant_id: $tenant_id})
+        OPTIONAL MATCH (tgt)-[hv:HAS_VALUE]->(a:Attribute)
+        WITH
+            tgt,
+            r,
+            collect(
+                CASE
+                    WHEN a IS NULL THEN NULL
+                    ELSE {
+                        name: a.name,
+                        val: coalesce(hv.value_string, toString(hv.value_numeric), hv.value_date, '')
+                    }
+                END
+            ) AS raw_values
+        RETURN
+            tgt.id AS entity_id,
+            tgt.type_name AS type_name,
+            r.relationship_type AS relationship_type,
+            'outbound' AS direction,
+            [value IN raw_values WHERE value IS NOT NULL AND value.val <> ''] AS values
+        UNION
+        MATCH (src:Entity {tenant_id: $tenant_id})-[r:CONNECTED_TO]->(tgt:Entity {id: $entity_id, tenant_id: $tenant_id})
+        OPTIONAL MATCH (src)-[hv:HAS_VALUE]->(a:Attribute)
+        WITH
+            src,
+            r,
+            collect(
+                CASE
+                    WHEN a IS NULL THEN NULL
+                    ELSE {
+                        name: a.name,
+                        val: coalesce(hv.value_string, toString(hv.value_numeric), hv.value_date, '')
+                    }
+                END
+            ) AS raw_values
+        RETURN
+            src.id AS entity_id,
+            src.type_name AS type_name,
+            r.relationship_type AS relationship_type,
+            'inbound' AS direction,
+            [value IN raw_values WHERE value IS NOT NULL AND value.val <> ''] AS values
+        LIMIT 12
+        """,
+        entity_id=entity_id,
+        tenant_id=tenant_id,
+    )
+    action_result = await session.run(
+        """
+        MATCH (log:ActionLog {tenant_id: $tenant_id})-[:TARGETS]->(e:Entity {id: $entity_id, tenant_id: $tenant_id})
+        OPTIONAL MATCH (log)-[:PART_OF_CASE]->(c:Case {tenant_id: $tenant_id})
+        RETURN
+            log.id AS log_id,
+            log.action_type AS action_type,
+            log.status AS status,
+            log.timestamp AS timestamp,
+            log.executed_by AS executed_by,
+            c.id AS case_id
+        ORDER BY log.timestamp DESC
+        LIMIT 8
+        """,
+        entity_id=entity_id,
+        tenant_id=tenant_id,
+    )
+
+    properties = {
+        value["name"]: value["val"]
+        for value in row["values"]
+        if value["name"] and value["val"] not in ("None", "")
+    }
+    related_entities = [
+        RelatedEntity(
+            entity_id=related["entity_id"],
+            label=_pick_label(related["type_name"], related["values"]),
+            type_name=related["type_name"],
+            relationship_type=related["relationship_type"],
+            direction=related["direction"],
+        )
+        for related in await related_result.data()
+    ]
+    recent_actions = [
+        RecentAction(
+            log_id=action["log_id"],
+            action_type=action["action_type"],
+            status=action["status"],
+            timestamp=str(action["timestamp"]) if action["timestamp"] else "",
+            executed_by=action["executed_by"],
+            case_id=action["case_id"],
+        )
+        for action in await action_result.data()
+    ]
+
+    return EntityDetailResponse(
+        entity_id=row["entity_id"],
+        label=_pick_label(row["type_name"], row["values"]),
+        type_name=row["type_name"],
+        tenant_id=row["tenant_id"],
+        properties=properties,
+        related_entities=related_entities,
+        recent_actions=recent_actions,
+        relationship_count=row["relationship_count"],
+    )

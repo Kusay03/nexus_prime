@@ -8,11 +8,24 @@ class AttributeValue(BaseModel):
     value_string: Optional[str] = None
     value_numeric: Optional[float] = None
     value_date: Optional[str] = None  # ISO format: "YYYY-MM-DD"
+    value_boolean: Optional[bool] = None
 
     @model_validator(mode="after")
     def at_least_one_value(self) -> "AttributeValue":
-        if self.value_string is None and self.value_numeric is None and self.value_date is None:
-            raise ValueError("At least one of value_string, value_numeric, or value_date must be set")
+        provided_fields = [
+            self.value_string is not None,
+            self.value_numeric is not None,
+            self.value_date is not None,
+            self.value_boolean is not None,
+        ]
+        if sum(provided_fields) == 0:
+            raise ValueError(
+                "At least one of value_string, value_numeric, value_date, or value_boolean must be set"
+            )
+        if sum(provided_fields) > 1:
+            raise ValueError(
+                "Only one of value_string, value_numeric, value_date, or value_boolean may be set"
+            )
         return self
 
 
@@ -43,6 +56,13 @@ class BulkIngestRequest(BaseModel):
     operations: list[Operation] = Field(..., min_length=1)
 
 
+class WebhookIngestRequest(BaseModel):
+    source: str = Field(..., min_length=1, max_length=80)
+    event_type: str = Field(..., min_length=1, max_length=120)
+    event_id: Optional[str] = Field(default=None, max_length=120)
+    operations: list[Operation] = Field(..., min_length=1)
+
+
 # ── Responses ─────────────────────────────────────────────────────────────────
 
 class EntityCreatedResponse(BaseModel):
@@ -70,6 +90,13 @@ class BulkIngestResponse(BaseModel):
     connections: list[ConnectionCreatedResponse]
 
 
+class WebhookIngestResponse(BulkIngestResponse):
+    source: str
+    event_type: str
+    event_id: str
+    received_at: str
+
+
 # ── CSV ingest ────────────────────────────────────────────────────────────────
 
 class DlqEntry(BaseModel):
@@ -77,6 +104,14 @@ class DlqEntry(BaseModel):
     raw_row: dict[str, str]
     error: str
     timestamp: str
+    type_name: str | None = None
+    column_map: dict[str, str] | None = None
+
+
+class DlqKeySummary(BaseModel):
+    key: str
+    item_count: int
+    created_at: str | None = None
 
 
 class CsvIngestResponse(BaseModel):
@@ -85,3 +120,21 @@ class CsvIngestResponse(BaseModel):
     failed: int
     dlq_key: str        # Redis list key — inspect with GET /ingest/dlq?key=...
     entity_ids: list[str]
+
+
+class DlqRetryRequest(BaseModel):
+    key: str = Field(..., min_length=1)
+    row_indices: list[int] = Field(default_factory=list, max_length=200)
+
+
+class DlqRetryFailure(BaseModel):
+    row_index: int
+    error: str
+
+
+class DlqRetryResponse(BaseModel):
+    key: str
+    requested: int
+    recovered: int
+    remaining: int
+    failed: list[DlqRetryFailure] = []

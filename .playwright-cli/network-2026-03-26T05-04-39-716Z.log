@@ -1,0 +1,2 @@
+[GET] http://localhost:8000/auth/bootstrap/status => [200] OK
+[GET] http://localhost:8000/auth/bootstrap/status => [200] OK

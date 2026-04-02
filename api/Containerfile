@@ -1,14 +1,31 @@
-FROM python:3.11-slim
+FROM docker.io/library/node:20-alpine AS frontend-build
+
+WORKDIR /app/frontend
+
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci --fetch-retries 5 --fetch-retry-factor 2 --fetch-retry-mintimeout 20000 --fetch-retry-maxtimeout 120000
+
+COPY frontend/ ./
+RUN npm run build
+
+
+FROM docker.io/library/python:3.11-slim AS runtime
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-RUN pip install --upgrade pip
+RUN python -m pip install --upgrade pip
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY api/requirements.txt /tmp/requirements.txt
+RUN python -m pip install --no-cache-dir -r /tmp/requirements.txt
 
-COPY . .
+COPY api/ /app/api/
+COPY --from=frontend-build /app/frontend/dist /app/frontend/dist
+
+WORKDIR /app/api
 
 EXPOSE 8000
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
